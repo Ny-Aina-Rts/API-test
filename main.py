@@ -1,66 +1,110 @@
+from datetime import datetime
 from math import trunc
+from typing import List
 
 from fastapi import FastAPI
 from pydantic import BaseModel
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+from fastapi.responses import PlainTextResponse, HTMLResponse
 
 app = FastAPI()
 
+@app.get("/ping", response_class=PlainTextResponse)
+def ping():
+    return "pong"
 
-@app.get("/hello")
-def read_hello(request: Request, name: str = "Non défini", is_teacher: bool = None):
-    accept_header = request.headers.get("Accept")
-    if accept_header != "text/plain":
-        return JSONResponse(
-            {"message": "Unsupported Media Type"},
-            status_code=400
-        )
-    if name == "Non défini" and is_teacher is None:
-        return JSONResponse(
-            {"message": "Hello Word"},
-            status_code=200
-        )
-    if is_teacher is None:
-        is_teacher = False
-    if is_teacher:
-        return (JSONResponse(
-            {"message": f"Hello teacher {name}"},
-            status_code=200
-        ))
-    return (JSONResponse(
-        {"message": f"Hello {name}"},
-        status_code=200
-    ))
+@app.get("/home", response_class=HTMLResponse)
+def home():
+    return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Home</title>
+        </head>
+        <body>
+            <h1>Welcome home!</h1>
+        </body>
+        </html>
+    """
 
-class WelcomeRequest(BaseModel):
-    name: str
+@app.get("/{path:path}", include_in_schema=False)
+def not_found(path: str):
+    return HTMLResponse(
+        content="""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>404 Not Found</title>
+            </head>
+            <body>
+                <h1>404 NOT FOUND</h1>
+            </body>
+            </html>
+        """,
+        status_code=404
+    )
 
+class Post(BaseModel):
+    author: str
+    title: str
+    content: str
+    creation_datetime: datetime
+class Post(BaseModel):
+    author: str
+    title: str
+    content: str
+    creation_datetime: datetime
 
-@app.post("/welcome")
-def welcome_user(request: WelcomeRequest):
-    return {f"Bienvenue {request.name}"}
+posts_storage: List[Post] = []
 
+@app.post("/posts", response_model=List[Post], status_code=201)
+def create_posts(posts: List[Post]):
+    posts_storage.extend(posts)
+    return posts_storage
 
-class SecretPayload(BaseModel):
-    secret_code: int
+@app.get("/posts", response_model=List[Post], status_code=200)
+def get_posts():
+    return posts_storage
 
+@app.put("/posts", response_model=List[Post], status_code=200)
+def update_or_create_post(post: Post):
+    for i, stored_post in enumerate(posts_storage):
+        if stored_post.title == post.title:
+            posts_storage[i] = post
+            return posts_storage
+    posts_storage.append(post)
+    return posts_storage
 
-@app.put("/top-secret")
-def put_top_secret(request: Request, request_body: SecretPayload):
-    auth_header = request.headers.get("Authorization")
-    if auth_header != "my-secret-key":
-        return JSONResponse(
-            status_code=403,
-            content={"error": f"Unauthorized header received: {auth_header}"}
-        )
+posts_storage: List[Post] = []
 
-    secret_code = request_body.secret_code
-    code_length = len(str(secret_code))
-    if code_length != 4:
-        return JSONResponse(
-            status_code=400,
-            content={"error": f"Le code fourni n’est pas à 4 chiffres mais {code_length} chiffres."}
-        )
+@app.post("/posts", response_model=List[Post], status_code=201)
+def create_posts(posts: List[Post]):
+    posts_storage.extend(posts)
+    return posts_storage
 
-    return JSONResponse(content={"message": f"Voici le code {secret_code}"}, status_code=200)
+class Post(BaseModel):
+    author: str
+    title: str
+    content: str
+    creation_datetime: datetime
+
+posts_storage: List[Post] = []
+
+@app.post("/posts", response_model=List[Post], status_code=201)
+def create_posts(posts: List[Post]):
+    posts_storage.extend(posts)
+    return posts_storage
+
+@app.get("/posts", response_model=List[Post], status_code=200)
+def get_posts():
+    return posts_storage
+
+@app.put("/posts", response_model=List[Post], status_code=200)
+def update_or_create_post(post: Post):
+    for i, stored_post in enumerate(posts_storage):
+        if stored_post.title == post.title:
+            posts_storage[i] = post
+            return posts_storage
+    posts_storage.append(post)
+    return posts_storage
